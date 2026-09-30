@@ -1,0 +1,73 @@
+{
+  "llama-3.3-70b-versatile": {
+    "capabilities": [
+      "text_generation",
+      "chat_history"
+    ],
+    "options": [
+      "functionDeclarations",
+      "outputSchema",
+      "inputModalities"
+    ],
+    "features": {
+      "text": true,
+      "vision": false,
+      "tools": true,
+      "structured": true,
+      "reasoning": false,
+      "embedding": false,
+      "image": false
+    },
+    "contextLength": 131072
+  },
+  "meta-llama/llama-4-scout-17b-16e-instruct": {
+    "capabilities": [
+      "text_generation",
+      "chat_history"
+    ],
+    "options": [
+      "functionDeclarations",
+      "outputSchema",
+      "inputModalities"
+    ],
+    "features": {
+      "text": true,
+      "vision": true,
+      "tools": true,
+      "structured": true,
+      "reasoning": false,
+      "embedding": false,
+      "image": false
+    },
+    "contextLength": 131072
+  },
+  "openai/gpt-oss-120b": {
+    "capabilities": [
+      "text_generation",
+      "chat_history"
+    ],
+    "options": [
+      "functionDeclarations",
+      "outputSchema"
+    ],
+    "features": {
+      "text": true,
+      "vision": false,
+      "tools": true,
+      "structured": true,
+      "reasoning": true,
+      "embedding": false,
+      "image": false
+    },
+    "contextLength": 131072
+  },
+  "whisper-large-v3": {
+    "excluded": true
+  },
+  "meta-llama/llama-guard-4-12b": {
+    "excluded": true
+  },
+  "llama-3.1-70b-versatile": {
+    "excluded": true
+  }
+}
