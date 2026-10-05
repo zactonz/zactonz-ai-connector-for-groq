@@ -43,7 +43,7 @@ class GroqTextGenerationModel extends AbstractOpenAiCompatibleTextGenerationMode
 	 * @return array<string, mixed> The response format parameter.
 	 */
 	protected function prepareResponseFormatParam( ?array $output_schema ): array { // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid
-		if ( is_array( $output_schema ) ) {
+		if ( is_array( $output_schema ) && GroqProfile::supports( 'structured_schema' ) ) {
 			return array(
 				'type'        => 'json_schema',
 				'json_schema' => array(

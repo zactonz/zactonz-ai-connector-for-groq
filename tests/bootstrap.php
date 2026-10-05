@@ -475,4 +475,16 @@ function zctz_test_seed_settings( array $extra = array() ) {
 require dirname( __DIR__ ) . '/igniter.php';
 \Zactonz\AiConnectorForGroq\zctz_load();
 
+$zctz_test_registry = \WordPress\AiClient\AiClient::defaultRegistry();
+if ( ! $zctz_test_registry->hasProvider( \Zactonz\AiConnectorForGroq\Provider\GroqProfile::id() ) ) {
+	$zctz_test_registry->registerProvider( \Zactonz\AiConnectorForGroq\Provider\GroqProvider::class );
+}
+
+function zctz_test_reset_credentials(): void {
+	\WordPress\AiClient\AiClient::defaultRegistry()->setProviderRequestAuthentication(
+		\Zactonz\AiConnectorForGroq\Provider\GroqProfile::id(),
+		new \WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication( '' )
+	);
+}
+
 require __DIR__ . '/support/FakeHttp.php';

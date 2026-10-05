@@ -25,6 +25,7 @@ class StreamingTest extends TestCase {
 	private $port = 0;
 
 	protected function setUp(): void {
+		zctz_test_reset_credentials();
 		if ( ! function_exists( 'curl_init' ) || ! function_exists( 'proc_open' ) ) {
 			$this->markTestSkipped( 'cURL and proc_open are required for the streaming integration test.' );
 		}

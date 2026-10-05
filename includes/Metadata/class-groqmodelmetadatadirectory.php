@@ -652,7 +652,15 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 
 		if ( $features['structured'] ) {
 			$options[] = new SupportedOption( OptionEnum::outputMimeType(), array( 'text/plain', 'application/json' ) );
-			$options[] = new SupportedOption( OptionEnum::outputSchema() );
+
+			/*
+			 * JSON mode and a JSON schema are not the same thing. DeepSeek accepts
+			 * response_format json_object but has no json_schema, so a schema is only
+			 * offered where the provider can honour one.
+			 */
+			if ( GroqProfile::supports( 'structured_schema' ) ) {
+				$options[] = new SupportedOption( OptionEnum::outputSchema() );
+			}
 		} else {
 			$options[] = new SupportedOption( OptionEnum::outputMimeType(), array( 'text/plain' ) );
 		}

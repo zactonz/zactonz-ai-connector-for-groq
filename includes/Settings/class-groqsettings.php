@@ -19,6 +19,7 @@ use Zactonz\AiConnectorForGroq\Http\GroqRequestAuthentication;
 use Zactonz\AiConnectorForGroq\Provider\GroqEndpoint;
 use Zactonz\AiConnectorForGroq\Provider\GroqProfile;
 use WordPress\AiClient\AiClient;
+use WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication;
 
 /**
  * Settings screen and stored configuration for the connector.
@@ -347,7 +348,20 @@ class GroqSettings {
 			$sanitized[ $key ] = $submitted;
 		}
 
-		$this->save_api_key( $value );
+		$stored = $this->save_api_key( $value );
+
+		/*
+		 * The credential itself is read back from the AI Client, which only has it
+		 * once WordPress has handed it over. This records that a key was stored, so
+		 * the screen can still say so, and still offer to remove it, on a request
+		 * where the credential is not readable.
+		 */
+		if ( null === $stored ) {
+			$sanitized['has_api_key'] = ! empty( $existing['has_api_key'] );
+		} else {
+			$sanitized['has_api_key'] = $stored;
+		}
+
 		$this->set_request_authentication();
 		$this->invalidate_model_cache();
 
@@ -407,7 +421,7 @@ class GroqSettings {
 	 */
 	public function render_api_key_field(): void {
 		$override = self::get_api_key_override();
-		$has_key  = '' !== self::get_saved_api_key();
+		$has_key  = self::has_stored_api_key();
 		?>
 
 		<input
@@ -996,11 +1010,13 @@ class GroqSettings {
 	}
 
 	/**
-	 * Applies the stored credential to the AI Client registry.
+	 * Applies the credential to the AI Client registry.
 	 *
 	 * @since 1.0.0
+	 *
+	 * @param string|null $api_key Key to apply, or null for the key in use.
 	 */
-	public function set_request_authentication(): void {
+	public function set_request_authentication( ?string $api_key = null ): void {
 		if ( ! class_exists( AiClient::class ) ) {
 			return;
 		}
@@ -1012,7 +1028,7 @@ class GroqSettings {
 
 		$registry->setProviderRequestAuthentication(
 			GroqProfile::id(),
-			new GroqRequestAuthentication( self::get_api_key() )
+			new GroqRequestAuthentication( $api_key ?? self::get_api_key() )
 		);
 	}
 
@@ -1044,22 +1060,27 @@ class GroqSettings {
 	 *
 	 * @param array<string, mixed> $value Submitted settings values.
 	 */
-	private function save_api_key( array $value ): void {
+	private function save_api_key( array $value ): ?bool {
 		if ( ! empty( $value['clear_api_key'] ) ) {
 			update_option( self::api_key_option(), '' );
-			return;
+			$this->set_request_authentication( self::get_api_key_override() );
+			return false;
 		}
 
 		if ( ! isset( $value['api_key'] ) ) {
-			return;
+			return null;
 		}
 
 		$api_key = sanitize_text_field( (string) $value['api_key'] );
 		if ( '' === $api_key ) {
-			return;
+			return null;
 		}
 
 		update_option( self::api_key_option(), $api_key );
+		$override = self::get_api_key_override();
+		$this->set_request_authentication( '' !== $override ? $override : $api_key );
+
+		return true;
 	}
 
 	/**
@@ -1155,9 +1176,9 @@ class GroqSettings {
 	 *
 	 * WordPress discovers every registered AI Client provider as a connector and
 	 * registers one API key setting per connector, which the Connectors screen
-	 * writes and which core hands to the AI Client on init. The connector reads
-	 * and writes that same option, so both screens always agree and neither can
-	 * overwrite the other with a stale or empty credential.
+	 * writes and which core hands to the AI Client on init. The connector's own
+	 * settings screen writes that same option, so both screens always agree, and
+	 * the key is read back through the AI Client rather than from the option.
 	 *
 	 * @since 1.0.0
 	 *
@@ -1168,16 +1189,48 @@ class GroqSettings {
 	}
 
 	/**
-	 * Returns the API key stored in the database.
+	 * Returns the API key WordPress has handed to the AI Client for this provider.
 	 *
 	 * @since 1.0.0
 	 *
 	 * @return string Stored API key, or an empty string.
 	 */
 	public static function get_saved_api_key(): string {
-		$api_key = get_option( self::api_key_option(), '' );
+		if ( ! class_exists( AiClient::class ) ) {
+			return '';
+		}
 
-		return is_string( $api_key ) ? $api_key : '';
+		$registry = AiClient::defaultRegistry();
+		if ( ! $registry->hasProvider( GroqProfile::id() ) ) {
+			return '';
+		}
+
+		$authentication = $registry->getProviderRequestAuthentication( GroqProfile::id() );
+
+		return $authentication instanceof ApiKeyRequestAuthentication ? $authentication->getApiKey() : '';
+	}
+
+	/**
+	 * Reports whether an API key has been stored for this connector.
+	 *
+	 * Separate from the key itself: the credential comes back from the AI Client,
+	 * which WordPress only populates while it is wiring connectors, so a site with
+	 * AI support switched off reads no key even though one is saved. This answers
+	 * the question the settings screen actually asks, without reading the
+	 * credential out of the option.
+	 *
+	 * @since 1.0.1
+	 *
+	 * @return bool True when a key is stored.
+	 */
+	public static function has_stored_api_key(): bool {
+		if ( '' !== self::get_saved_api_key() ) {
+			return true;
+		}
+
+		$settings = self::get_settings();
+
+		return ! empty( $settings['has_api_key'] );
 	}
 
 	/**

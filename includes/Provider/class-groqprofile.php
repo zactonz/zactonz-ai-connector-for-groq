@@ -33,6 +33,26 @@ class GroqProfile {
 	public static function data(): array {
 		// phpcs:disable PluginCheck.CodeAnalysis.AIProvider.DirectIntegration -- Provider addresses registered with the WordPress AI Client, not a direct integration.
 		return array(
+			'releases'          => array(
+				array(
+					'version' => '1.0.1',
+					'date'    => '2026-10-05',
+					'notice'  => 'Obtains the API key through the WordPress AI Client, and keeps the settings screen accurate on a site with AI support switched off.',
+					'changes' => array(
+						'Changed the saved API key to be read back from the WordPress AI Client rather than straight from the option WordPress registers for the connector, which is how a connector is meant to obtain its credentials.',
+						'Fixed the settings screen reporting no saved API key, and hiding the control that removes it, on a site where AI support is switched off. The key is read back from the AI Client, which WordPress only populates while it is wiring connectors.',
+						'Fixed the model-discovery answer in the FAQ, which described capability detection for embeddings this connector does not offer, and claimed capabilities are read from the provider rather than guessed. Where Groq publishes no per-model capability data the connector falls back to inference.',
+					),
+				),
+				array(
+					'version' => '1.0.0',
+					'date'    => '2026-09-17',
+					'notice'  => 'Initial release.',
+					'changes' => array(
+						'initial',
+					),
+				),
+			),
 			'name'              => 'Groq',
 			'article'           => 'A',
 			'class'             => 'Groq',
@@ -54,13 +74,14 @@ class GroqProfile {
 			'tags'              => 'connector, groq, ai, ai-client, llm',
 			'reasoning_pattern' => 'gpt-oss|deepseek-r1|qwen3',
 			'capabilities'      => array(
-				'text'       => true,
-				'vision'     => true,
-				'tools'      => true,
-				'structured' => true,
-				'embedding'  => false,
-				'image'      => false,
-				'reasoning'  => true,
+				'text'              => true,
+				'vision'            => true,
+				'tools'             => true,
+				'structured'        => true,
+				'structured_schema' => true,
+				'embedding'         => false,
+				'image'             => false,
+				'reasoning'         => true,
 			),
 			'default_timeout'   => 120,
 			'model_notes'       => 'Models are listed from your GroqCloud account.',

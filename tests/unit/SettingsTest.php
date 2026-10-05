@@ -5,12 +5,15 @@ declare( strict_types=1 );
 namespace Zactonz\AiConnectorForGroq\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use WordPress\AiClient\AiClient;
+use WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication;
 use Zactonz\AiConnectorForGroq\Provider\GroqProfile;
 use Zactonz\AiConnectorForGroq\Settings\GroqSettings;
 
 class SettingsTest extends TestCase {
 
 	protected function setUp(): void {
+		zctz_test_reset_credentials();
 		$GLOBALS['zctz_test_options']         = array();
 		$GLOBALS['zctz_test_settings_errors'] = array();
 		$GLOBALS['zctz_test_http_responses']  = array();
@@ -153,12 +156,24 @@ class SettingsTest extends TestCase {
 
 	public function test_a_key_entered_on_the_core_connectors_screen_is_used(): void {
 		// Seeds whatever else this provider needs, so the assertion below is about
-		// the key being read from core's option and nothing else.
+		// the key core handed to the AI Client and nothing else.
 		zctz_test_seed_settings();
 		$GLOBALS['zctz_test_options'][ GroqSettings::api_key_option() ] = 'key-from-core-screen';
+		AiClient::defaultRegistry()->setProviderRequestAuthentication(
+			GroqProfile::id(),
+			new ApiKeyRequestAuthentication( 'key-from-core-screen' )
+		);
 
 		$this->assertSame( 'key-from-core-screen', GroqSettings::get_api_key() );
 		$this->assertTrue( GroqSettings::has_credentials() );
+	}
+
+	public function test_the_key_is_read_through_the_ai_client_not_the_option(): void {
+		zctz_test_seed_settings();
+		$GLOBALS['zctz_test_options'][ GroqSettings::api_key_option() ] = 'only-in-the-option';
+		zctz_test_reset_credentials();
+
+		$this->assertSame( '', GroqSettings::get_saved_api_key() );
 	}
 
 	public function test_saving_on_the_connector_screen_writes_the_key_core_reads(): void {
@@ -192,5 +207,54 @@ class SettingsTest extends TestCase {
 		}
 
 		$this->assertSame( array( GroqSettings::api_key_option() ), $holders );
+	}
+
+	public function test_the_screen_still_knows_a_key_is_stored_when_the_credential_is_unreadable(): void {
+		$settings = new GroqSettings();
+
+		// WordPress persists what the sanitize callback returns, so mirror that.
+		$GLOBALS['zctz_test_options']['zctz_groq_settings'] = $settings->sanitize_settings( array( 'api_key' => 'stored-key' ) );
+
+		$this->assertTrue( GroqSettings::has_stored_api_key() );
+
+		// Stand in for a request where WordPress never handed the key to the AI
+		// Client, which is what happens with AI support switched off.
+		zctz_test_reset_credentials();
+
+		$this->assertSame( '', GroqSettings::get_saved_api_key() );
+		$this->assertTrue(
+			GroqSettings::has_stored_api_key(),
+			'The screen must still offer to remove a key that is stored.'
+		);
+	}
+
+	public function test_clearing_the_key_clears_the_stored_flag(): void {
+		$settings = new GroqSettings();
+		$GLOBALS['zctz_test_options']['zctz_groq_settings'] = $settings->sanitize_settings( array( 'api_key' => 'stored-key' ) );
+		$GLOBALS['zctz_test_options']['zctz_groq_settings'] = $settings->sanitize_settings( array( 'clear_api_key' => '1' ) );
+
+		$this->assertFalse( GroqSettings::has_stored_api_key() );
+	}
+
+	public function test_a_save_that_does_not_touch_the_key_keeps_the_stored_flag(): void {
+		$settings = new GroqSettings();
+		$GLOBALS['zctz_test_options']['zctz_groq_settings'] = $settings->sanitize_settings( array( 'api_key' => 'stored-key' ) );
+
+		$sanitized = $settings->sanitize_settings( array( 'request_timeout' => '60' ) );
+
+		$this->assertTrue( $sanitized['has_api_key'] );
+		$this->assertTrue( GroqSettings::has_stored_api_key() );
+	}
+
+	public function test_nothing_is_stored_before_a_key_is_entered(): void {
+		$this->assertFalse( GroqSettings::has_stored_api_key() );
+	}
+
+	public function test_the_stored_flag_is_a_boolean_not_the_credential(): void {
+		$settings  = new GroqSettings();
+		$sanitized = $settings->sanitize_settings( array( 'api_key' => 'secret-value' ) );
+
+		$this->assertIsBool( $sanitized['has_api_key'] );
+		$this->assertNotContains( 'secret-value', $sanitized, 'The settings array must never carry the credential.' );
 	}
 }

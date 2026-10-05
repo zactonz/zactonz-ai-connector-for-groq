@@ -15,6 +15,7 @@ use Zactonz\AiConnectorForGroq\Settings\GroqSettings;
 class DiagnosticsTest extends TestCase {
 
 	protected function setUp(): void {
+		zctz_test_reset_credentials();
 		$GLOBALS['zctz_test_options']        = array();
 		$GLOBALS['zctz_test_http_responses'] = array();
 		$GLOBALS['zctz_test_http_requests']  = array();

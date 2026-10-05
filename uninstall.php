@@ -2,8 +2,8 @@
 /**
  * Removes the connector's stored options when the plugin is deleted.
  *
- * WordPress registers one API key option per connector and this connector reads
- * and writes that option rather than keeping a second copy, so deleting the
+ * WordPress registers one API key option per connector and this connector writes
+ * that option rather than keeping a second copy, so deleting the
  * plugin takes the credential with it instead of leaving a usable key behind.
  *
  * @package Zactonz\AiConnectorForGroq

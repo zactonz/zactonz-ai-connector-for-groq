@@ -12,6 +12,7 @@ use Zactonz\AiConnectorForGroq\Settings\GroqSettings;
 class ProviderTest extends TestCase {
 
 	protected function setUp(): void {
+		zctz_test_reset_credentials();
 		$GLOBALS['zctz_test_options'] = array();
 	}
 

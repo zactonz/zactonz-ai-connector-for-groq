@@ -25,6 +25,7 @@ class TextGenerationModelTest extends TestCase {
 	private const MODEL_ID = 'zctz-test-model';
 
 	protected function setUp(): void {
+		zctz_test_reset_credentials();
 		$GLOBALS['zctz_test_options'] = array();
 		zctz_test_seed_settings();
 	}
@@ -132,8 +133,19 @@ class TextGenerationModelTest extends TestCase {
 		$model->generateTextResult( $this->prompt() );
 
 		$body = json_decode( (string) $transporter->lastRequest()->getBody(), true );
-		$this->assertSame( 'json_schema', $body['response_format']['type'] );
-		$this->assertSame( 'object', $body['response_format']['json_schema']['schema']['type'] );
+
+		if ( GroqProfile::supports( 'structured_schema' ) ) {
+			$this->assertSame( 'json_schema', $body['response_format']['type'] );
+			$this->assertSame( 'object', $body['response_format']['json_schema']['schema']['type'] );
+
+			return;
+		}
+
+		/*
+		 * A provider without json_schema must fall back to JSON mode rather than send a
+		 * response_format it rejects. DeepSeek documents json_object only.
+		 */
+		$this->assertSame( array( 'type' => 'json_object' ), $body['response_format'] );
 	}
 
 	public function test_the_reasoning_preference_is_only_applied_to_the_default_text_model(): void {
@@ -177,4 +189,5 @@ class TextGenerationModelTest extends TestCase {
 		);
 		$this->model( $transporter )->generateTextResult( $this->prompt() );
 	}
+
 }
