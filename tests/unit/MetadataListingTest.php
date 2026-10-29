@@ -160,4 +160,121 @@ class MetadataListingTest extends TestCase {
 
 		$this->assertCount( 1, $this->directory( $listing )->listModelMetadata() );
 	}
+
+	public function test_a_model_the_provider_keeps_to_itself_is_not_offered(): void {
+		$listing = array(
+			'data' => array(
+				array( 'id' => 'aaa/house', 'internal' => true ),
+				array( 'id' => 'bbb/public' ),
+			),
+		);
+
+		$ids = array();
+		foreach ( $this->directory( $listing )->listModelMetadata() as $model ) {
+			$ids[] = $model->getId();
+		}
+
+		$this->assertSame( array( 'bbb/public' ), $ids );
+	}
+
+	public function test_a_task_the_client_cannot_represent_is_not_offered(): void {
+		$listing = array(
+			'data' => array(
+				array( 'id' => 'aaa/pages', 'capabilities' => array( 'ocr' => true ) ),
+				array( 'id' => 'bbb/policy', 'capabilities' => array( 'moderation' => true ) ),
+				array( 'id' => 'ccc/labels', 'capabilities' => array( 'classification' => true ) ),
+				array( 'id' => 'ddd/listen', 'capabilities' => array( 'audio_transcription' => true ) ),
+				array( 'id' => 'eee/live', 'capabilities' => array( 'audio_transcription_realtime' => true ) ),
+				array( 'id' => 'fff/speak', 'capabilities' => array( 'audio_speech' => true ) ),
+				array( 'id' => 'ggg/chat', 'capabilities' => array( 'completion_chat' => true ) ),
+			),
+		);
+
+		$ids = array();
+		foreach ( $this->directory( $listing )->listModelMetadata() as $model ) {
+			$ids[] = $model->getId();
+		}
+
+		$this->assertSame(
+			array( 'ggg/chat' ),
+			$ids,
+			'The reported task decides, because an identifier need not announce it.'
+		);
+	}
+
+	public function test_audio_input_alone_does_not_disqualify_a_chat_model(): void {
+		$listing = array(
+			'data' => array(
+				array(
+					'id'           => 'aaa/listener',
+					'capabilities' => array( 'completion_chat' => true, 'audio' => true ),
+				),
+			),
+		);
+
+		$ids = array();
+		foreach ( $this->directory( $listing )->listModelMetadata() as $model ) {
+			$ids[] = $model->getId();
+		}
+
+		$this->assertSame( array( 'aaa/listener' ), $ids );
+	}
+
+	public function test_a_model_with_an_announced_retirement_is_offered_but_not_preferred(): void {
+		$listing = array(
+			'data' => array(
+				array( 'id' => 'aaa/sunsetting', 'deprecation' => '2026-09-29' ),
+				array( 'id' => 'zzz/current' ),
+			),
+		);
+
+		$ids = array();
+		foreach ( $this->directory( $listing )->listModelMetadata() as $model ) {
+			$ids[] = $model->getId();
+		}
+
+		$this->assertSame(
+			array( 'zzz/current', 'aaa/sunsetting' ),
+			$ids,
+			'A model that still answers stays on the list, behind the one that is not going away.'
+		);
+	}
+
+	public function test_an_experimental_model_is_offered_but_not_preferred(): void {
+		$listing = array(
+			'data' => array(
+				array( 'id' => 'labs-acme-model-x-1' ),
+				array( 'id' => 'mmm/stable' ),
+			),
+		);
+
+		$ids = array();
+		foreach ( $this->directory( $listing )->listModelMetadata() as $model ) {
+			$ids[] = $model->getId();
+		}
+
+		$this->assertSame(
+			array( 'mmm/stable', 'labs-acme-model-x-1' ),
+			$ids,
+			'An experimental model sorts ahead alphabetically but must not become the default.'
+		);
+	}
+
+	public function test_a_deprioritized_model_still_wins_when_the_site_chooses_it(): void {
+		$listing = array(
+			'data' => array(
+				array( 'id' => 'aaa/sunsetting', 'deprecation' => '2026-09-29' ),
+				array( 'id' => 'zzz/current' ),
+			),
+		);
+
+		$GLOBALS['zctz_test_options']['zctz_groq_settings'] = array( 'model_text' => 'aaa/sunsetting' );
+
+		$ids = array();
+		foreach ( $this->directory( $listing )->listModelMetadata() as $model ) {
+			$ids[] = $model->getId();
+		}
+
+		$this->assertSame( 'aaa/sunsetting', $ids[0], 'An explicit choice outranks the demotion.' );
+	}
 }

@@ -3,7 +3,7 @@ Contributors:      zactonz
 Tags:              connector, groq, ai, ai-client, llm
 Requires at least: 7.0
 Tested up to:      7.1
-Stable tag:        1.0.1
+Stable tag:        1.0.2
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -30,7 +30,7 @@ Groq runs open models on its own LPU hardware and is built around one thing: spe
 * Cancellable server-sent event streaming for content, reasoning, and tool-call chunks
 * A configurable request timeout for text generation
 * API key supplied by a PHP constant or an environment variable instead of the database
-* An API base URL override for a proxy or a private gateway
+* An API base URL override for a proxy or gateway, within the hosts and ports WordPress permits outbound requests to
 * Redacted diagnostics and a WordPress Site Health connectivity test
 
 **Requirements:**
@@ -78,6 +78,15 @@ No. The key is stored in its own option, is never rendered back into the setting
 
 == Changelog ==
 
+= 1.0.2 =
+
+* Fixed a reply arriving empty when the provider answers with a list of content chunks rather than a single string, which the AI Client's parser does not read. The chunks were being dropped, so the request looked successful and returned nothing.
+* Fixed models the provider serves for other tasks - transcription, speech, moderation and the like - being offered as text models. The task the provider declares is now believed, rather than guessed from the model's name.
+* Fixed entries the provider marks as internal reaching the model picker. They answer the listing but are not products.
+* Fixed the reasoning effort selector being able to offer a level the connector would not then accept. The list the selector is built from and the list that is accepted are now the same one, and are tested against each other.
+* Changed the reasoning effort description, which said a model that always reasons ignores the setting. Which levels a model accepts is the provider's business, and a model may ignore or refuse the level chosen.
+* Changed the base URL override wording, which did not say that WordPress restricts which hosts and ports an outbound request may reach.
+
 = 1.0.1 =
 
 * Changed the saved API key to be read back from the WordPress AI Client rather than straight from the option WordPress registers for the connector, which is how a connector is meant to obtain its credentials.
@@ -95,6 +104,10 @@ No. The key is stored in its own option, is never rendered back into the setting
 * Supports an API key supplied by a PHP constant or an environment variable.
 
 == Upgrade Notice ==
+
+= 1.0.2 =
+
+Fixes a reply arriving empty when the provider answers in content chunks, stops models meant for other tasks being offered as text models, and makes the reasoning effort selector agree with what the connector accepts.
 
 = 1.0.1 =
 

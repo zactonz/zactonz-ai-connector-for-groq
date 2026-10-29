@@ -5,7 +5,7 @@
  * Description:       Adds a Groq connector to Settings > Connectors for the WordPress AI Client, for very low latency inference.
  * Requires at least: 7.0
  * Requires PHP:      7.4
- * Version:           1.0.1
+ * Version:           1.0.2
  * Author:            Zactonz Technologies
  * Author URI:        https://zactonz.com/
  * License:           GPL-2.0-or-later
@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'ZCTZ_GROQ_MIN_PHP_VERSION', '7.4' );
 define( 'ZCTZ_GROQ_MIN_WP_VERSION', '7.0' );
-define( 'ZCTZ_GROQ_VERSION', '1.0.1' );
+define( 'ZCTZ_GROQ_VERSION', '1.0.2' );
 define( 'ZCTZ_GROQ_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ZCTZ_GROQ_PLUGIN_FILE', __FILE__ );
 

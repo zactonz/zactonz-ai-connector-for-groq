@@ -95,6 +95,28 @@ class SettingsTest extends TestCase {
 		$this->assertSame( 'default', $sanitized['reasoning'] );
 	}
 
+	public function test_every_reasoning_level_the_provider_accepts_survives_sanitising(): void {
+		$settings = new GroqSettings();
+
+		foreach ( array( 'none', 'minimal', 'low', 'medium', 'high' ) as $level ) {
+			$sanitized = $settings->sanitize_settings( array( 'reasoning' => $level ) );
+
+			$this->assertSame( $level, $sanitized['reasoning'], "reasoning level {$level} was rejected" );
+		}
+	}
+
+	public function test_the_reasoning_selector_offers_exactly_the_levels_it_accepts(): void {
+		$settings = new GroqSettings();
+
+		ob_start();
+		$settings->render_reasoning_field();
+		$markup = (string) ob_get_clean();
+
+		preg_match_all( '/<option value="([^"]*)"/', $markup, $matches );
+
+		$this->assertSame( array( 'default', 'none', 'minimal', 'low', 'medium', 'high' ), $matches[1] );
+	}
+
 	public function test_the_base_url_gains_a_scheme_and_loses_a_trailing_slash(): void {
 		$settings  = new GroqSettings();
 		$sanitized = $settings->sanitize_settings( array( 'base_url' => 'proxy.example.test/v1/' ) );

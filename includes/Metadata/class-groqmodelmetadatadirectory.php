@@ -186,10 +186,10 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 		$statuses = array();
 
 		/*
-		 * Some listings carry a boolean rather than a status word. Groq publishes
-		 * "active" on every model and sets it false for one it has retired, which is
-		 * still returned by the catalogue and would otherwise be offered, and sort
-		 * ahead of the models that do work.
+		 * Some listings carry a boolean rather than a status word. A provider may
+		 * publish "active" on every model and set it false for one it has retired,
+		 * which is still returned by the catalogue and would otherwise be offered,
+		 * sorting ahead of the models that do work.
 		 */
 		if ( isset( $entry['active'] ) && is_bool( $entry['active'] ) && ! $entry['active'] ) {
 			return false;
@@ -198,6 +198,15 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 			return false;
 		}
 		if ( isset( $entry['deprecated'] ) && is_bool( $entry['deprecated'] ) && $entry['deprecated'] ) {
+			return false;
+		}
+
+		/*
+		 * A provider may mark the entries it serves to itself rather than to the
+		 * account holder. They answer the listing but are not products, so they
+		 * must not reach the model picker.
+		 */
+		if ( isset( $entry['internal'] ) && is_bool( $entry['internal'] ) && $entry['internal'] ) {
 			return false;
 		}
 
@@ -457,14 +466,36 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 	/**
 	 * Reports whether a model serves a task the AI Client cannot represent.
 	 *
+	 * A provider that files its models by task is believed before the identifier
+	 * is read. A listing may return transcription, speech, OCR, moderation and
+	 * classification models alongside the chat models and flag each one, and
+	 * identifiers do not reliably announce the task: a safety classifier can
+	 * carry a name that says nothing of the sort.
+	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $identifier Identifier text.
+	 * @param string              $identifier Identifier text.
+	 * @param array<string, bool> $reported Capability flags as the provider reported them.
 	 * @return bool True when the model should be skipped entirely.
 	 */
-	private function is_unsupported_task( string $identifier ): bool {
+	private function is_unsupported_task( string $identifier, array $reported = array() ): bool {
+		$unsupported = array(
+			'ocr',
+			'moderation',
+			'classification',
+			'audio_transcription',
+			'audio_transcription_realtime',
+			'audio_speech',
+		);
+
+		foreach ( $unsupported as $task ) {
+			if ( ! empty( $reported[ $task ] ) ) {
+				return true;
+			}
+		}
+
 		return 1 === preg_match(
-			'/whisper|transcribe|(^|[-_\/])tts(-|$)|text-to-speech|speech-to-text|guard|moderation|rerank|-ocr(-|$)|safety/',
+			'/whisper|transcribe|(^|[-_\/])tts(-|$)|text-to-speech|speech-to-text|guard|moderation|rerank|-ocr(-|$)|safety|(^|[-_\/])(voice|video)(-|\.|$)/',
 			$identifier
 		);
 	}
@@ -510,9 +541,21 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 			$is_embedding = false;
 		}
 
-		$is_text = ! $is_embedding && ! $is_image && ! $this->is_unsupported_task( $identifier );
+		/*
+		 * A model whose output this client has no way to receive is not a text model,
+		 * whatever else it reports. Providers have begun serving video and speech from
+		 * the same catalogue as their chat models - xAI lists grok-imagine-video and
+		 * grok-voice beside grok-4 - and those arrived with no task flag and a name no
+		 * pattern was looking for, so they were offered as text. Reading the declared
+		 * output modality catches them, and catches the next kind without a code change.
+		 */
+		$unrepresentable_output = array() !== $output_modality
+			&& array() === array_intersect( array( 'text', 'image', 'embedding' ), $output_modality );
+
+		$is_text = ! $is_embedding && ! $is_image && ! $unrepresentable_output
+			&& ! $this->is_unsupported_task( $identifier, $reported );
 		if ( isset( $reported['completion_chat'] ) ) {
-			$is_text = (bool) $reported['completion_chat'] && ! $is_embedding && ! $is_image;
+			$is_text = (bool) $reported['completion_chat'] && ! $is_embedding && ! $is_image && ! $unrepresentable_output;
 		}
 
 		$has_vision = $is_text && GroqProfile::supports( 'vision' ) && (
@@ -546,7 +589,14 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 			in_array( 'include_reasoning', $parameters, true ) ||
 			in_array( 'reasoning_effort', $parameters, true ) ||
 			! empty( $reported['reasoning'] ) ||
-			1 === preg_match( '/reason|thinking|(^|[-_\/])r1(-|$)|(^|[-_\/])o[13](-|$)|qwq/', $identifier ) ||
+
+			/*
+			 * The lookbehind is load-bearing: xAI ships a reasoning and a non-reasoning
+			 * snapshot of the same version, and a bare 'reason' matches the substring in
+			 * grok-4.20-0309-non-reasoning, flagging as a reasoning model the one model
+			 * whose own name says it is not.
+			 */
+			1 === preg_match( '/(?<!non-)reason|thinking|(^|[-_\/])r1(-|$)|(^|[-_\/])o[13](-|$)|qwq/', $identifier ) ||
 			( '' !== $reasoning_pattern && 1 === preg_match( '/' . $reasoning_pattern . '/', $identifier ) )
 		);
 
@@ -654,9 +704,9 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 			$options[] = new SupportedOption( OptionEnum::outputMimeType(), array( 'text/plain', 'application/json' ) );
 
 			/*
-			 * JSON mode and a JSON schema are not the same thing. DeepSeek accepts
-			 * response_format json_object but has no json_schema, so a schema is only
-			 * offered where the provider can honour one.
+			 * JSON mode and a JSON schema are not the same thing. A provider may
+			 * accept response_format json_object without supporting json_schema, so
+			 * a schema is only offered where the provider can honour one.
 			 */
 			if ( GroqProfile::supports( 'structured_schema' ) ) {
 				$options[] = new SupportedOption( OptionEnum::outputSchema() );
@@ -694,6 +744,7 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 	 */
 	private function sort_models_map( array $models_map ): array {
 		ksort( $models_map );
+		$models_map = $this->demote_models( $models_map );
 
 		$leading = array();
 
@@ -712,6 +763,66 @@ class GroqModelMetadataDirectory extends AbstractApiBasedModelMetadataDirectory 
 		}
 
 		return $leading + array_diff_key( $models_map, $leading );
+	}
+
+	/**
+	 * Moves the models a provider does not stand behind to the back of the list.
+	 *
+	 * Because the AI Client takes the first listed model that supports what was
+	 * asked for, list position decides what an unconfigured site actually calls.
+	 * Two kinds of entry must never win that by accident. A provider may publish a
+	 * retirement date on a model the moment a replacement exists - the model keeps
+	 * working until that date, so removing it would take away something that still
+	 * answers, but it should not be the default a site inherits. Experimental
+	 * entries are the second kind: documented as unfit for production, sometimes
+	 * with no way to opt out of data collection, and a prefix such as `labs-` can
+	 * sort ahead of a provider's ordinary identifiers on an alphabetical list.
+	 *
+	 * Both stay selectable. Only their position changes, and a model the site has
+	 * explicitly chosen is pulled back to the front afterwards regardless.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, ModelMetadata> $models_map Models keyed by identifier.
+	 * @return array<string, ModelMetadata> The same models, deprioritized ones last.
+	 */
+	private function demote_models( array $models_map ): array {
+		$keep    = array();
+		$demoted = array();
+
+		foreach ( $models_map as $model_id => $metadata ) {
+			$entry = isset( $this->model_entries[ $model_id ] ) ? $this->model_entries[ $model_id ] : array();
+
+			if ( $this->is_deprioritized( (string) $model_id, $entry ) ) {
+				$demoted[ $model_id ] = $metadata;
+				continue;
+			}
+
+			$keep[ $model_id ] = $metadata;
+		}
+
+		if ( array() === $demoted ) {
+			return $models_map;
+		}
+
+		return $keep + $demoted;
+	}
+
+	/**
+	 * Reports whether a model should be offered but not preferred.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string               $model_id Model identifier.
+	 * @param array<string, mixed> $entry Raw model entry.
+	 * @return bool True when the model should sort last.
+	 */
+	private function is_deprioritized( string $model_id, array $entry ): bool {
+		if ( isset( $entry['deprecation'] ) && is_string( $entry['deprecation'] ) && '' !== $entry['deprecation'] ) {
+			return true;
+		}
+
+		return 1 === preg_match( '/(^|[-_\/])labs(-|$)/', strtolower( $model_id ) );
 	}
 
 	/**

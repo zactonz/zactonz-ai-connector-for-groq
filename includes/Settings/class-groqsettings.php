@@ -28,18 +28,19 @@ use WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication;
  */
 class GroqSettings {
 
-	private const OPTION_GROUP     = 'zctz_groq_settings';
-	private const OPTION_NAME      = 'zctz_groq_settings';
-	private const SECRET_PREFIX    = 'zctz_groq_secret_';
-	private const PAGE_SLUG        = 'zactonz-ai-connector-for-groq';
-	private const SECTION_MAIN     = 'zctz_groq_main';
-	private const SECTION_MODELS   = 'zctz_groq_models';
-	private const SECTION_ADVANCED = 'zctz_groq_advanced';
-	private const AJAX_MODELS      = 'zctz_groq_list_models';
-	private const AJAX_DIAGNOSTICS = 'zctz_groq_diagnostics';
-	private const AJAX_CONNECTION  = 'zctz_groq_save_connection';
-	private const NONCE_ACTION     = 'zctz_groq_nonce';
-	private const REASONING_MODES  = array( 'default', 'none', 'minimal', 'low', 'medium', 'high' );
+	private const OPTION_GROUP      = 'zctz_groq_settings';
+	private const OPTION_NAME       = 'zctz_groq_settings';
+	private const SECRET_PREFIX     = 'zctz_groq_secret_';
+	private const PAGE_SLUG         = 'zactonz-ai-connector-for-groq';
+	private const SECTION_MAIN      = 'zctz_groq_main';
+	private const SECTION_MODELS    = 'zctz_groq_models';
+	private const SECTION_ADVANCED  = 'zctz_groq_advanced';
+	private const AJAX_MODELS       = 'zctz_groq_list_models';
+	private const AJAX_DIAGNOSTICS  = 'zctz_groq_diagnostics';
+	private const AJAX_CONNECTION   = 'zctz_groq_save_connection';
+	private const NONCE_ACTION      = 'zctz_groq_nonce';
+	private const REASONING_EFFORTS = array( 'none', 'minimal', 'low', 'medium', 'high' );
+	private const REASONING_MODES   = array( 'default', 'none', 'minimal', 'low', 'medium', 'high' );
 
 	/**
 	 * Returns the capability keys that get a default-model selector.
@@ -605,14 +606,21 @@ class GroqSettings {
 	 */
 	public function render_reasoning_field(): void {
 		$value  = self::get_reasoning_effort();
-		$labels = array(
-			'default' => __( 'Model default', 'zactonz-ai-connector-for-groq' ),
+		$names  = array(
 			'none'    => __( 'No reasoning', 'zactonz-ai-connector-for-groq' ),
 			'minimal' => __( 'Minimal', 'zactonz-ai-connector-for-groq' ),
 			'low'     => __( 'Low', 'zactonz-ai-connector-for-groq' ),
 			'medium'  => __( 'Medium', 'zactonz-ai-connector-for-groq' ),
 			'high'    => __( 'High', 'zactonz-ai-connector-for-groq' ),
+			'xhigh'   => __( 'Extra high', 'zactonz-ai-connector-for-groq' ),
 		);
+		$labels = array( 'default' => __( 'Model default', 'zactonz-ai-connector-for-groq' ) );
+
+		foreach ( self::REASONING_EFFORTS as $effort ) {
+			if ( isset( $names[ $effort ] ) ) {
+				$labels[ $effort ] = $names[ $effort ];
+			}
+		}
 		?>
 
 		<select
@@ -624,7 +632,7 @@ class GroqSettings {
 			<?php endforeach; ?>
 		</select>
 		<p class="description">
-			<?php echo esc_html__( 'Applied to the default text model when it reports reasoning support. Models that always reason ignore this.', 'zactonz-ai-connector-for-groq' ); ?>
+			<?php echo esc_html__( 'Sent with requests to the default text model, and left off every other request. Which levels a model accepts is up to the provider, so a model that does not reason, or that does not accept the level chosen here, may ignore or refuse it.', 'zactonz-ai-connector-for-groq' ); ?>
 		</p>
 		<p class="description" id="<?php echo esc_attr( self::OPTION_NAME . '-reasoning-support' ); ?>"></p>
 
@@ -1219,7 +1227,7 @@ class GroqSettings {
 	 * the question the settings screen actually asks, without reading the
 	 * credential out of the option.
 	 *
-	 * @since 1.0.1
+	 * @since 1.0.2
 	 *
 	 * @return bool True when a key is stored.
 	 */

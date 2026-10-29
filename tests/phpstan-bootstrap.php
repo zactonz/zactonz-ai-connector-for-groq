@@ -5,4 +5,4 @@
 
 define( 'ZCTZ_GROQ_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
 define( 'ZCTZ_GROQ_PLUGIN_FILE', dirname( __DIR__ ) . '/igniter.php' );
-define( 'ZCTZ_GROQ_VERSION', '1.0.1' );
+define( 'ZCTZ_GROQ_VERSION', '1.0.2' );

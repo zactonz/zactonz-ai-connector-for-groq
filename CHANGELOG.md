@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.2 - 2026-10-29
+
+- Fixed a reply arriving empty when the provider answers with a list of content chunks rather than a single string, which the AI Client's parser does not read. The chunks were being dropped, so the request looked successful and returned nothing.
+- Fixed models the provider serves for other tasks - transcription, speech, moderation and the like - being offered as text models. The task the provider declares is now believed, rather than guessed from the model's name.
+- Fixed entries the provider marks as internal reaching the model picker. They answer the listing but are not products.
+- Fixed the reasoning effort selector being able to offer a level the connector would not then accept. The list the selector is built from and the list that is accepted are now the same one, and are tested against each other.
+- Changed the reasoning effort description, which said a model that always reasons ignores the setting. Which levels a model accepts is the provider's business, and a model may ignore or refuse the level chosen.
+- Changed the base URL override wording, which did not say that WordPress restricts which hosts and ports an outbound request may reach.
+
 ## 1.0.1 - 2026-10-05
 
 - Changed the saved API key to be read back from the WordPress AI Client rather than straight from the option WordPress registers for the connector, which is how a connector is meant to obtain its credentials.

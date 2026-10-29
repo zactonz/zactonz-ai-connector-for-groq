@@ -60,6 +60,125 @@ class GroqTextGenerationModel extends AbstractOpenAiCompatibleTextGenerationMode
 	/**
 	 * {@inheritDoc}
 	 *
+	 * The OpenAI-compatible parser in the AI Client only reads a message whose
+	 * `content` is a string. Several providers answer with a list of content
+	 * chunks instead once reasoning is involved - Groq documents exactly
+	 * that for a raised reasoning effort, and some of the models it hosts never
+	 * return anything else - and the chunks were being dropped, which surfaced as
+	 * an empty response rather than an error. Flattening the list here keeps the
+	 * parent in charge of parts, channels and tool calls.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, mixed> $message_data The message data from the API response.
+	 * @param int                  $index The index of the choice in the choices array.
+	 * @return array<int, \WordPress\AiClient\Messages\DTO\MessagePart> The parsed message parts.
+	 */
+	protected function parseResponseChoiceMessageParts( array $message_data, int $index ): array { // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid
+		if ( isset( $message_data['content'] ) && is_array( $message_data['content'] ) ) {
+			list( $text, $thinking ) = self::split_content_chunks( $message_data['content'] );
+
+			$message_data['content'] = $text;
+
+			if ( '' !== $thinking && ! isset( $message_data['reasoning_content'] ) ) {
+				$message_data['reasoning_content'] = $thinking;
+			}
+		}
+
+		return parent::parseResponseChoiceMessageParts( $message_data, $index );
+	}
+
+	/**
+	 * Separates a content value into visible text and reasoning text.
+	 *
+	 * A string is returned untouched, so a provider that answers the plain
+	 * OpenAI shape is unaffected. A list is read as content chunks: a text chunk
+	 * contributes to the answer and a thinking chunk to the reasoning trace,
+	 * which is where Groq puts a thinking trace rather than in a
+	 * `reasoning_content` field. Chunk kinds the AI Client cannot represent, such
+	 * as an image or a document reference, are skipped.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param mixed $content Content value as the provider sent it.
+	 * @return array{0: string, 1: string} Visible text, then reasoning text.
+	 */
+	protected static function split_content_chunks( $content ): array {
+		if ( is_string( $content ) ) {
+			return array( $content, '' );
+		}
+
+		if ( ! is_array( $content ) ) {
+			return array( '', '' );
+		}
+
+		$text     = '';
+		$thinking = '';
+
+		foreach ( $content as $chunk ) {
+			if ( is_string( $chunk ) ) {
+				$text .= $chunk;
+				continue;
+			}
+
+			if ( ! is_array( $chunk ) ) {
+				continue;
+			}
+
+			$type = isset( $chunk['type'] ) && is_string( $chunk['type'] ) ? $chunk['type'] : '';
+
+			if ( 'thinking' === $type ) {
+				$thinking .= self::flatten_thinking_chunk( $chunk );
+				continue;
+			}
+
+			if ( ( '' === $type || 'text' === $type ) && isset( $chunk['text'] ) && is_string( $chunk['text'] ) ) {
+				$text .= $chunk['text'];
+			}
+		}
+
+		return array( $text, $thinking );
+	}
+
+	/**
+	 * Reads the text out of one thinking chunk.
+	 *
+	 * A thinking chunk carries its own list of parts, so the text sits one level
+	 * further down than in a text chunk.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, mixed> $chunk Thinking chunk.
+	 * @return string Reasoning text.
+	 */
+	private static function flatten_thinking_chunk( array $chunk ): string {
+		if ( isset( $chunk['thinking'] ) && is_string( $chunk['thinking'] ) ) {
+			return $chunk['thinking'];
+		}
+
+		if ( ! isset( $chunk['thinking'] ) || ! is_array( $chunk['thinking'] ) ) {
+			return '';
+		}
+
+		$thinking = '';
+
+		foreach ( $chunk['thinking'] as $part ) {
+			if ( is_string( $part ) ) {
+				$thinking .= $part;
+				continue;
+			}
+
+			if ( is_array( $part ) && isset( $part['text'] ) && is_string( $part['text'] ) ) {
+				$thinking .= $part['text'];
+			}
+		}
+
+		return $thinking;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
 	 * @since 1.0.0
 	 *
 	 * @param HttpMethodEnum                     $method HTTP method.
@@ -192,20 +311,26 @@ class GroqTextGenerationModel extends AbstractOpenAiCompatibleTextGenerationMode
 			$delta  = isset( $choice['delta'] ) && is_array( $choice['delta'] ) ? $choice['delta'] : array();
 			$events = array();
 
-			if ( isset( $delta['content'] ) && is_string( $delta['content'] ) && '' !== $delta['content'] ) {
-				$state['content'] .= $delta['content'];
+			list( $delta_text, $delta_thinking ) = self::split_content_chunks(
+				isset( $delta['content'] ) ? $delta['content'] : null
+			);
+
+			if ( '' !== $delta_text ) {
+				$state['content'] .= $delta_text;
 				$events[]          = array(
 					'type'  => 'content_delta',
-					'delta' => $delta['content'],
+					'delta' => $delta_text,
 					'raw'   => $chunk,
 				);
 			}
 
-			$thinking = '';
-			foreach ( array( 'reasoning_content', 'reasoning' ) as $key ) {
-				if ( isset( $delta[ $key ] ) && is_string( $delta[ $key ] ) && '' !== $delta[ $key ] ) {
-					$thinking = $delta[ $key ];
-					break;
+			$thinking = $delta_thinking;
+			if ( '' === $thinking ) {
+				foreach ( array( 'reasoning_content', 'reasoning' ) as $key ) {
+					if ( isset( $delta[ $key ] ) && is_string( $delta[ $key ] ) && '' !== $delta[ $key ] ) {
+						$thinking = $delta[ $key ];
+						break;
+					}
 				}
 			}
 			if ( '' !== $thinking ) {

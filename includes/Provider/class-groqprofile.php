@@ -35,6 +35,19 @@ class GroqProfile {
 		return array(
 			'releases'          => array(
 				array(
+					'version' => '1.0.2',
+					'date'    => '2026-10-29',
+					'notice'  => 'Fixes a reply arriving empty when the provider answers in content chunks, stops models meant for other tasks being offered as text models, and makes the reasoning effort selector agree with what the connector accepts.',
+					'changes' => array(
+						'Fixed a reply arriving empty when the provider answers with a list of content chunks rather than a single string, which the AI Client\'s parser does not read. The chunks were being dropped, so the request looked successful and returned nothing.',
+						'Fixed models the provider serves for other tasks - transcription, speech, moderation and the like - being offered as text models. The task the provider declares is now believed, rather than guessed from the model\'s name.',
+						'Fixed entries the provider marks as internal reaching the model picker. They answer the listing but are not products.',
+						'Fixed the reasoning effort selector being able to offer a level the connector would not then accept. The list the selector is built from and the list that is accepted are now the same one, and are tested against each other.',
+						'Changed the reasoning effort description, which said a model that always reasons ignores the setting. Which levels a model accepts is the provider\'s business, and a model may ignore or refuse the level chosen.',
+						'Changed the base URL override wording, which did not say that WordPress restricts which hosts and ports an outbound request may reach.',
+					),
+				),
+				array(
 					'version' => '1.0.1',
 					'date'    => '2026-10-05',
 					'notice'  => 'Obtains the API key through the WordPress AI Client, and keeps the settings screen accurate on a site with AI support switched off.',
